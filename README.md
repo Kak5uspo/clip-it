@@ -1,10 +1,10 @@
-# clipforge
+# ClipIt
 
 Finds highlights in the Twitch VODs of any streamer you configure, cuts and
 edits them into vertical clips, and lets you review them before anything is
 published.
 
-> **Status: work in progress.** So far clipforge finds the highlights of a VOD
+> **Status: work in progress.** So far ClipIt finds the highlights of a VOD
 > and downloads the matching excerpts. Cutting, subtitles, the dashboard and
 > the YouTube upload follow; see [SPEC.md](SPEC.md) for the plan.
 
@@ -27,7 +27,7 @@ fill in your streamers and keys. Both files stay on your machine.
 Check that everything is in place:
 
 ```bash
-uv run python -m clipforge doctor
+uv run python -m clip_it doctor
 ```
 
 ### Twitch API keys
@@ -48,7 +48,7 @@ Needed for finding new VODs and for viewer clips (not for `process` below).
 Process one VOD, given its id or link:
 
 ```bash
-uv run python -m clipforge process https://www.twitch.tv/videos/<VOD id>
+uv run python -m clip_it process https://www.twitch.tv/videos/<VOD id>
 ```
 
 This downloads the chat log, finds the highlights, measures the loudness of
@@ -59,8 +59,28 @@ vertical 1080x1920 clip. Everything lands in `data/vods/<VOD id>/`, with a
 muted are skipped and listed. Running the command again reuses what is
 already downloaded.
 
-Subtitles, hook text and fine trimming are not built yet: the clips are the
-rough window from 20 seconds before the chat reacts to 8 seconds after.
+### Subtitles and fine cut
+
+Subtitles need the optional speech recognition:
+
+```bash
+uv sync --extra subtitles
+```
+
+With it, ClipIt transcribes each highlight, moves the start and end of the
+clip onto sentence boundaries (15 to 45 seconds, never more than 59) and burns
+in subtitles: three words at a time, the spoken word highlighted, words from
+your `subtitles.censor` list shown as `S***`. A short hook text sits in the
+picture for the first seconds. Without the extra, clips are the rough window
+from 20 seconds before the chat reacts to 8 seconds after, without subtitles.
+
+`subtitles.model` picks the Whisper model. On an 8-core laptop CPU, 50 seconds
+of speech took 10 seconds with `small` and 82 seconds with `medium`; `medium`
+got slang and punctuation noticeably better. The model is downloaded on first
+use (about 0.5 GB for `small`, 1.5 GB for `medium`).
+
+On Windows, keep the project in a folder with a short path. Tools that nest
+their files deeply can hit the 260-character path limit otherwise.
 
 ### Layouts
 
@@ -80,7 +100,7 @@ streamers:
 To find and verify the numbers, draw them onto a frame of the stream:
 
 ```bash
-uv run python -m clipforge layout-check data/vods/<VOD id>/excerpt_<n>.mp4 --streamer example_streamer
+uv run python -m clip_it layout-check data/vods/<VOD id>/excerpt_<n>.mp4 --streamer example_streamer
 ```
 
 The picture `data/layout_check_<streamer>.png` shows a grid with lines every
@@ -90,11 +110,11 @@ yellow and the gameplay rectangle in cyan.
 To only look at what the detection finds in a chat log you already have:
 
 ```bash
-uv run python -m clipforge detect data/vods/<VOD id>/chat.json
+uv run python -m clip_it detect data/vods/<VOD id>/chat.json
 ```
 
 All detection settings and their defaults are documented in
-[clipforge/defaults.yaml](clipforge/defaults.yaml). Override the ones you want
+[clip_it/defaults.yaml](clip_it/defaults.yaml). Override the ones you want
 to change in your `config.yaml`, globally or per streamer.
 
 ### Tuning detection

@@ -4,8 +4,8 @@ import subprocess
 
 import pytest
 
-from clipforge.detect import Highlight
-from clipforge.signals import loudness, rank
+from clip_it.detect import Highlight
+from clip_it.signals import loudness, rank
 
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
 

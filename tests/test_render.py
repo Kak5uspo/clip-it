@@ -6,8 +6,9 @@ import subprocess
 
 import pytest
 
-from clipforge.config import ConfigError, build_config
-from clipforge.render import layout_check, layout_for, render
+from clip_it.config import ConfigError, build_config
+from clip_it.render import hook_position, layout_check, layout_for, render
+from clip_it.subtitles import Word, build_ass
 
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
 
@@ -123,6 +124,49 @@ def test_loudness_is_brought_to_the_target(split_clip):
     integrated = float(re.findall(r"I:\s+(-?[\d.]+) LUFS", report)[-1])
 
     assert integrated == pytest.approx(-14.0, abs=2.0)  # the source tone is far quieter
+
+
+def count_pixels(video, at, x, y, w, h, matches):
+    """How many pixels of a region of one frame satisfy `matches(r, g, b)`."""
+    raw = subprocess.run(
+        ["ffmpeg", "-v", "error", "-ss", str(at), "-i", str(video), "-frames:v", "1",
+         "-vf", f"crop={w}:{h}:{x}:{y}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+        capture_output=True, check=True,
+    ).stdout
+    return sum(1 for i in range(0, len(raw), 3) if matches(*raw[i : i + 3]))
+
+
+def white(r, g, b):
+    return min(r, g, b) > 200
+
+
+def yellow(r, g, b):
+    return r > 200 and g > 180 and b < 90
+
+
+@needs_ffmpeg
+def test_subtitles_and_hook_are_burned_into_the_picture(source, tmp_path):
+    cfg = config(layout="split", facecam=FACECAM, gameplay=GAMEPLAY)
+    streamer = cfg["streamers"]["test"]
+    ass = tmp_path / "clip.ass"
+    ass.write_text(
+        build_ass([Word(2.5, 3.0, "hallo"), Word(3.0, 3.5, "welt")], cfg["subtitles"], hook="Schau mal",
+                  hook_y=hook_position("split", streamer, cfg["render"])),
+        encoding="utf-8",
+    )
+    out = tmp_path / "clip.mp4"
+
+    render(source, out, 1.0, 5.0, cfg, "test", ass=ass)
+
+    subtitle_area = (140, 1207, 800, 120)  # around 66 % of the height
+    # While "hallo" is spoken it is yellow and "welt" waits in white; before that the area is empty.
+    assert count_pixels(out, 2.75, *subtitle_area, yellow) > 300
+    assert count_pixels(out, 2.75, *subtitle_area, white) > 300
+    assert count_pixels(out, 1.0, *subtitle_area, white) == 0
+    # The hook is a yellow box on the dividing line during the first seconds only.
+    hook_area = (140, 680, 800, 100)
+    assert count_pixels(out, 1.0, *hook_area, yellow) > 3000
+    assert count_pixels(out, 3.5, *hook_area, yellow) == 0
 
 
 @needs_ffmpeg

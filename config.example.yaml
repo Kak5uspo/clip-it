@@ -2,7 +2,7 @@
 # machine (it is listed in .gitignore).
 #
 # You only need the settings you want to change. Every setting and its
-# default is documented in clipforge/defaults.yaml.
+# default is documented in clip_it/defaults.yaml.
 
 streamers:
   example_streamer:            # the Twitch login, as in twitch.tv/example_streamer

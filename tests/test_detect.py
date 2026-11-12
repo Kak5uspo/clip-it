@@ -4,8 +4,8 @@ import random
 
 import pytest
 
-from clipforge.config import build_config, detect_settings
-from clipforge.detect import detect, read_chat
+from clip_it.config import build_config, detect_settings
+from clip_it.detect import detect, read_chat
 
 NOISE = ["hallo", "was geht", "lol", "wer ist noch da", "KEKW", "ja", "nein", "gg", "wann gta 6", "LUL", "ok", "moin"]
 LAUGH = ["KEKW", "OMEGALUL", "LUL xD", "KEKW KEKW KEKW", "HAHAHA KEKW", "ICANT"]

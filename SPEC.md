@@ -1,10 +1,10 @@
-# clipforge – Specification
+# ClipIt – Specification
 
 Status: approved on 2026-11-11. Milestones 1 to 3 are implemented, 4 to 7 are open.
 
 ## 1. Goal
 
-clipforge is an open-source tool that finds highlights in the Twitch VODs of any streamer you configure, cuts and edits them into finished vertical clips on its own, and presents them in a local dashboard for review. Approved clips are uploaded to YouTube Shorts; for TikTok it provides the file and caption for manual posting.
+ClipIt is an open-source tool that finds highlights in the Twitch VODs of any streamer you configure, cuts and edits them into finished vertical clips on its own, and presents them in a local dashboard for review. Approved clips are uploaded to YouTube Shorts; for TikTok it provides the file and caption for manual posting.
 
 The project will be published on GitHub as free to use. Nothing in the repository is tied to a specific streamer, game or channel: all of that lives in the user's local `config.yaml`.
 
@@ -201,25 +201,25 @@ FastAPI with one plain HTML page, English, no JavaScript framework.
 - Scheduling: upload as private with a publish time; YouTube then publishes on its own, even if the machine is off
 - Slots, title template, description template and hashtags come from the config, with the placeholders `{title}`, `{streamer}`, `{login}` and `{game}`
 - Category Gaming, language from the streamer entry, not "made for kids"
-- **Lock:** without a permission entry or `own_channel: true` for the streamer, clipforge refuses the upload and says why
+- **Lock:** without a permission entry or `own_channel: true` for the streamer, ClipIt refuses the upload and says why
 
 ### TikTok
 No automatic upload. The dashboard provides file and caption; the user posts via tiktok.com or the app.
 
 ## 9. Operation
 
-- **Start:** `uv run clipforge serve` starts the dashboard, the processing queue and the check for new VODs (on start, then every 30 minutes)
-- **Other commands:** `clipforge doctor` checks ffmpeg, TwitchDownloaderCLI, font, keys and encoder; `clipforge process <VOD link>` processes one VOD without the dashboard
-- **Data:** SQLite (`data/clipforge.db`) with VODs, candidates/clips and uploads
+- **Start:** `uv run clip-it serve` starts the dashboard, the processing queue and the check for new VODs (on start, then every 30 minutes)
+- **Other commands:** `clip-it doctor` checks ffmpeg, TwitchDownloaderCLI, font, keys and encoder; `clip-it process <VOD link>` processes one VOD without the dashboard
+- **Data:** SQLite (`data/clip-it.db`) with VODs, candidates/clips and uploads
 - **Processing:** one queue, one job at a time
-- **Log:** `data/logs/clipforge.log`, rotating
+- **Log:** `data/logs/clip-it.log`, rotating
 - **Clean-up:** retention from the config; when the size limit is reached, the oldest raw excerpts go first
 - **Platforms:** written to be portable (Python, ffmpeg and TwitchDownloaderCLI exist for Windows, Linux and macOS). v1 is developed and tested on Windows 11 only
 - **Docker/server:** not in v1
 
 ## 10. Legal and security
 
-Not legal advice; these are the rules clipforge implements and the README states:
+Not legal advice; these are the rules ClipIt implements and the README states:
 
 - Only clip streamers who have agreed in writing (e.g. via Discord), or your own channel. Per streamer the config holds date, channel and a screenshot under `data/permissions/`. Without it there is no upload. The lock prevents accidents; it cannot stop deliberate misuse
 - Label paid clips as advertising according to your local rules
@@ -233,10 +233,10 @@ Not legal advice; these are the rules clipforge implements and the README states
 One Python package, one process, no services alongside it.
 
 ```
-clipforge/
+clip-it/
 ├── README.md  SPEC.md  LICENSE  THIRD_PARTY_LICENSES.md
 ├── pyproject.toml  config.example.yaml  .env.example  .gitignore
-├── clipforge/
+├── clip_it/
 │   ├── cli.py          commands: doctor, process, serve
 │   ├── config.py       load and validate config.yaml and .env
 │   ├── db.py           SQLite
@@ -278,7 +278,7 @@ clipforge/
 
 ## 13. Configuration
 
-Since milestone 1 the defaults live in `clipforge/defaults.yaml` (fully commented) and `config.example.yaml` is a short starter; a user's `config.yaml` holds only what differs. Unknown keys are reported as errors. The listing below shows the planned defaults; `emote_weight` was dropped and `min_rate: 1.0` added when detection moved to counting reactions only.
+Since milestone 1 the defaults live in `clip_it/defaults.yaml` (fully commented) and `config.example.yaml` is a short starter; a user's `config.yaml` holds only what differs. Unknown keys are reported as errors. The listing below shows the planned defaults; `emote_weight` was dropped and `min_rate: 1.0` added when detection moved to counting reactions only.
 
 ```yaml
 storage:
@@ -403,7 +403,7 @@ After each milestone I show the result and ask whether to continue. The days are
 | 1 | Wed 11 – Thu 12 Nov | Project skeleton, licence, config, `doctor`, chat log reader, spike detection, labels | Tests green; candidate list for a real VOD |
 | 2 | Fri 13 Nov | Twitch API (VODs, muted segments, viewer clips), game filter, audio loudness, ranking, excerpt download | Top-8 excerpts of one VOD are in the folder |
 | 3 | Sat 14 Nov | Rendering: split and blur, credit, loudness, encoder probing, layout check | Test video frames checked; one real clip without subtitles |
-| 4 | Sun 15 Nov | Transcript, fine cut, subtitles, censoring, hook, AI suggestions, auto-zoom | Finished clips via `clipforge process` |
+| 4 | Sun 15 Nov | Transcript, fine cut, subtitles, censoring, hook, AI suggestions, auto-zoom | Finished clips via `clip-it process` |
 | 5 | Mon 16 Nov | Dashboard: list, clip view, re-trimming, corrections, re-render, download, LAN access | A clip is approved in the browser |
 | 6 | Tue 17 Nov | YouTube: OAuth, upload, slots, lock, schedule view | Private test upload of a test video |
 | 7 | Wed 18 Nov | Automation, clean-up, statistics, README, dress rehearsal; jump cuts if time allows | Full run on a fresh VOD |
@@ -415,7 +415,7 @@ After each milestone I show the result and ask whether to continue. The days are
 ## 16. Open points and risks
 
 **Open**
-1. Whether the name "clipforge" is free on PyPI
+1. Register "clip-it" on PyPI before publishing a package (the name was free on 2026-11-12)
 
 **Risks**
 1. **Muted VOD passages:** Twitch mutes passages with music, often in games with licensed music. Good moments can be lost. Only live mode would help

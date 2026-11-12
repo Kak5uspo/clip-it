@@ -10,7 +10,7 @@ The burst-versus-baseline test (per-user cap, adaptive multiplier, minimum
 rate, debounce) is ported from clippy's src/firehose.ts (MIT, Copyright (c)
 2025 clippy contributors; see THIRD_PARTY_LICENSES.md). Counting reactions
 only, the robust z-score, the minimum number of chatters, labels and the
-stream-start fallback are clipforge's own.
+stream-start fallback are ClipIt's own.
 """
 from __future__ import annotations
 

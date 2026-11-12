@@ -1,5 +1,5 @@
 """The command line, driven through main() the way a user would call it."""
-from clipforge.cli import main
+from clip_it.cli import main
 from test_detect import ChatLog
 
 

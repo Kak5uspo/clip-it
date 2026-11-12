@@ -1,4 +1,4 @@
-"""Command line: `python -m clipforge <command>`."""
+"""Command line: `python -m clip_it <command>`."""
 from __future__ import annotations
 
 import argparse
@@ -105,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")  # stream titles with emoji on a legacy console
     parser = argparse.ArgumentParser(
-        prog="clipforge", description="Find highlights in Twitch VODs and turn them into vertical clips."
+        prog="clip-it", description="Find highlights in Twitch VODs and turn them into vertical clips."
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("doctor", help="check that tools, config and keys are in place")

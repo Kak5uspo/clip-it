@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from clipforge.config import ConfigError, build_config, detect_settings, load_config, load_env
+from clip_it.config import ConfigError, build_config, detect_settings, load_config, load_env
 
 ROOT = Path(__file__).parent.parent
 
@@ -88,13 +88,13 @@ def test_missing_config_file_explains_what_to_do(tmp_path):
 def test_load_env_reads_keys_without_overriding_existing_ones(tmp_path, monkeypatch):
     env_file = tmp_path / ".env"
     env_file.write_text(
-        '# comment\nCLIPFORGE_TEST_A=from-file\nCLIPFORGE_TEST_B="quoted"\n', encoding="utf-8"
+        '# comment\nCLIPIT_TEST_A=from-file\nCLIPIT_TEST_B="quoted"\n', encoding="utf-8"
     )
-    monkeypatch.setenv("CLIPFORGE_TEST_A", "already-set")
-    monkeypatch.setenv("CLIPFORGE_TEST_B", "placeholder")
-    monkeypatch.delenv("CLIPFORGE_TEST_B")
+    monkeypatch.setenv("CLIPIT_TEST_A", "already-set")
+    monkeypatch.setenv("CLIPIT_TEST_B", "placeholder")
+    monkeypatch.delenv("CLIPIT_TEST_B")
 
     load_env(env_file)
 
-    assert os.environ["CLIPFORGE_TEST_A"] == "already-set"
-    assert os.environ["CLIPFORGE_TEST_B"] == "quoted"
+    assert os.environ["CLIPIT_TEST_A"] == "already-set"
+    assert os.environ["CLIPIT_TEST_B"] == "quoted"

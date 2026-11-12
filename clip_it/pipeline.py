@@ -5,13 +5,18 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
+from . import transcribe
 from .config import detect_settings
 from .detect import detect, read_chat
-from .render import render
+from .edit import fine_cut
+from .render import hook_position, layout_for, render
 from .signals import loudness, rank
+from .subtitles import Word, build_ass
+from .suggest import suggest
 from .twitch import download_audio, download_chat, download_excerpt, vod_id
 
 DATA = Path("data/vods")
+_LISTEN_S = 15  # how far beyond the rough window the transcript reaches, so the fine cut has room
 
 
 def process(reference: str, cfg: dict, streamer: str | None = None, say=print) -> dict:
@@ -29,6 +34,7 @@ def process(reference: str, cfg: dict, streamer: str | None = None, say=print) -
     chat = read_chat(chat_path)
     login = (streamer or chat.streamer).lower()
     settings = detect_settings(cfg, login)
+    streamer = cfg["streamers"][login]
 
     highlights = detect(chat, settings)
     say(f"{len(highlights)} highlight(s) in the chat")
@@ -58,11 +64,31 @@ def process(reference: str, cfg: dict, streamer: str | None = None, say=print) -
             say(f"Downloading excerpt {number} of {len(ranked)} ...")
             download_excerpt(vod, file, start, end)
         clip = folder / f"clip_{h.spike_s:06d}.mp4"
-        say(f"Rendering clip {number} of {len(ranked)} ...")
-        render(file, clip, h.start_s - start, h.end_s - start, cfg, login)
+        say(f"Cutting and rendering clip {number} of {len(ranked)} ...")
+        # From here on, times count from the start of the excerpt file.
+        cut_start, cut_end, words = h.start_s - start, h.end_s - start, []
+        if cfg["subtitles"]["enabled"] and transcribe.available():
+            words = transcribe.transcribe(
+                file, max(0.0, cut_start - _LISTEN_S), min(end - start, cut_end + _LISTEN_S),
+                streamer["language"], cfg["subtitles"]["model"],
+            )
+            cut_start, cut_end = fine_cut(words, cut_start, cut_end, cfg["clip"], end - start)
+        suggestion = suggest(h.label, streamer["language"])
+        spoken = [
+            Word(w.start - cut_start, w.end - cut_start, w.text)
+            for w in words if w.start >= cut_start and w.end <= cut_end
+        ]
+        ass = clip.with_suffix(".ass")
+        ass.write_text(
+            build_ass(spoken, cfg["subtitles"], streamer["language"], hook=suggestion["hooks"][0],
+                      hook_y=hook_position(layout_for(streamer), streamer, cfg["render"])),
+            encoding="utf-8",
+        )
+        render(file, clip, cut_start, cut_end, cfg, login, ass=ass)
         candidates.append(
             {"rank": number, **asdict(h), "file": file.name, "file_start_s": start, "file_end_s": end,
-             "clip": clip.name}
+             "clip": clip.name, "clip_start_s": round(start + cut_start, 2), "clip_end_s": round(start + cut_end, 2),
+             **suggestion, "text": " ".join(w.text for w in spoken)}
         )
 
     summary = {

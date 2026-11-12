@@ -58,10 +58,21 @@ def _escape(text: str) -> str:
     return text.replace("\\", "/").replace(":", "\\:").replace("'", "").replace("%", "\\%")
 
 
-def _graph(layout: str, streamer: dict, r: dict, login: str) -> str:
+def _cam_height(streamer: dict, r: dict) -> int:
+    return round(r["height"] * streamer["facecam_share"] / 2) * 2
+
+
+def hook_position(layout: str, streamer: dict, r: dict) -> int:
+    """Vertical centre of the hook banner: on the dividing line (split) or above the picture (blur)."""
+    if layout == "split":
+        return _cam_height(streamer, r)
+    return (r["height"] - r["width"] * 9 // 16) // 2 - 70
+
+
+def _graph(layout: str, streamer: dict, r: dict, login: str, ass: Path | None) -> str:
     w, h = r["width"], r["height"]
     if layout == "split":
-        cam_h = round(h * streamer["facecam_share"] / 2) * 2
+        cam_h = _cam_height(streamer, r)
         parts = []
         for name, key, out_h in (("cam", "facecam", cam_h), ("game", "gameplay", h - cam_h)):
             rect = streamer[key]
@@ -88,19 +99,25 @@ def _graph(layout: str, streamer: dict, r: dict, login: str) -> str:
             f",drawtext=fontfile='{_escape(str(FONT))}':text='{_escape(credit)}':fontsize=40"
             f":fontcolor=white@{opacity}:borderw=3:bordercolor=black@{opacity}:x=36:y={credit_y}"
         )
+    if ass:
+        graph += f",subtitles=filename='{_escape(str(ass.resolve()))}':fontsdir='{_escape(str(FONT.parent))}'"
     return graph + "[v]"
 
 
 def render(
-    source: Path, out: Path, start: float, end: float, cfg: dict, login: str, layout: str | None = None
+    source: Path, out: Path, start: float, end: float, cfg: dict, login: str,
+    layout: str | None = None, ass: Path | None = None,
 ) -> None:
-    """Render the part of `source` from `start` to `end` (seconds) as a vertical clip."""
+    """Render the part of `source` from `start` to `end` (seconds) as a vertical clip.
+
+    `ass` is an optional subtitle file whose times count from the start of the clip.
+    """
     r, streamer = cfg["render"], cfg["streamers"][login]
     encoder = pick_encoder(r["encoder"])
     out.parent.mkdir(parents=True, exist_ok=True)
     result = _ffmpeg(
         "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}", "-i", str(source),
-        "-filter_complex", _graph(layout or layout_for(streamer), streamer, r, login),
+        "-filter_complex", _graph(layout or layout_for(streamer), streamer, r, login, ass),
         "-map", "[v]", "-map", "0:a:0",
         # ponytail: single-pass loudnorm; measure first and run it twice if clips miss the target audibly.
         "-af", f"loudnorm=I={r['loudness_lufs']}:TP=-1.5:LRA=11", "-ar", "48000",

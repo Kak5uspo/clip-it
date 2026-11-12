@@ -1,7 +1,7 @@
 """Helpers around TwitchDownloaderCLI that can be checked without the network."""
 import pytest
 
-from clipforge.twitch import vod_id
+from clip_it.twitch import vod_id
 
 
 @pytest.mark.parametrize(

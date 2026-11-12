@@ -4,7 +4,7 @@
 
 Source: https://github.com/hamzaskewl/clippy (`src/firehose.ts`)
 
-Ported to Python in `clipforge/detect.py`: the per-user cap of two messages
+Ported to Python in `clip_it/detect.py`: the per-user cap of two messages
 per burst window, the comparison of the burst rate with an average baseline
 using the adaptive multiplier `max(1.5, 2.5 - 0.1 * baseline)`, the minimum
 rate of one message per second, the 30-second debounce, and skipping
