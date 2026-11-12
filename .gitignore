@@ -1,0 +1,14 @@
+# Secrets and personal settings
+.env
+config.yaml
+
+# Runtime data and downloaded tools
+data/
+tools/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/

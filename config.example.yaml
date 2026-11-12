@@ -1,0 +1,20 @@
+# Copy this file to config.yaml and adjust it. config.yaml stays on your
+# machine (it is listed in .gitignore).
+#
+# You only need the settings you want to change. Every setting and its
+# default is documented in clipforge/defaults.yaml.
+
+streamers:
+  example_streamer:            # the Twitch login, as in twitch.tv/example_streamer
+    display_name: Example Streamer
+    language: en               # language of chat, subtitles and titles
+    games: []                  # e.g. ["Minecraft"]; empty = all games
+    emotes:                    # the channel's own 7TV/BTTV/FFZ emotes, by label
+      laugh: []
+      hype: []
+      shock: []
+
+# Example: stricter detection for every streamer.
+# detect:
+#   min_z: 5
+#   top_n: 5
