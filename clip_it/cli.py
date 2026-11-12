@@ -78,7 +78,7 @@ def cmd_detect(args: argparse.Namespace) -> int:
 
 
 def cmd_process(args: argparse.Namespace) -> int:
-    summary = process(args.vod, load_config(), args.streamer)
+    summary = process(args.vod, load_config(), args.streamer, redo=args.redo)
     print(f"\n{summary['title']}")
     print(f"{len(summary['candidates'])} clip(s) in {summary['folder']}")
     if summary["candidates"]:
@@ -101,6 +101,27 @@ def cmd_layout_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    import socket
+
+    import uvicorn
+
+    from .web.app import create_app
+
+    cfg = load_config()
+    lan, port = cfg["dashboard"]["lan"], cfg["dashboard"]["port"]
+    password = os.environ.get("DASHBOARD_PASSWORD") or None
+    if lan and not password:
+        raise ConfigError("dashboard.lan is on, so set DASHBOARD_PASSWORD in .env first.")
+    print(f"ClipIt dashboard: http://127.0.0.1:{port}")
+    if lan:
+        print(f"In your network: http://{socket.gethostbyname(socket.gethostname())}:{port} (any user name, your password)")
+    print("Stop with Ctrl+C.")
+    uvicorn.run(create_app(cfg, password=password if lan else None), host="0.0.0.0" if lan else "127.0.0.1",
+                port=port, log_level="warning")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")  # stream titles with emoji on a legacy console
@@ -113,6 +134,7 @@ def main(argv: list[str] | None = None) -> int:
     detect_parser.add_argument("chat", help="chat log (JSON) written by TwitchDownloaderCLI")
     process_parser = commands.add_parser("process", help="find a VOD's highlights and download their excerpts")
     process_parser.add_argument("vod", help="VOD id or twitch.tv/videos/... link")
+    process_parser.add_argument("--redo", action="store_true", help="make every clip again, dropping edits and status")
     for sub in (detect_parser, process_parser):
         sub.add_argument("--streamer", help="config entry to use (default: the streamer named in the chat log)")
     layout_parser = commands.add_parser(
@@ -121,10 +143,12 @@ def main(argv: list[str] | None = None) -> int:
     layout_parser.add_argument("video", help="any video file of the stream, e.g. a downloaded excerpt")
     layout_parser.add_argument("--streamer", required=True, help="config entry whose rectangles to draw")
     layout_parser.add_argument("--at", type=float, default=0.0, help="second of the video to take the frame from")
+    commands.add_parser("serve", help="open the review dashboard in your browser")
     args = parser.parse_args(argv)
 
     load_env()
-    handlers = {"doctor": cmd_doctor, "detect": cmd_detect, "process": cmd_process, "layout-check": cmd_layout_check}
+    handlers = {"doctor": cmd_doctor, "detect": cmd_detect, "process": cmd_process, "layout-check": cmd_layout_check,
+                "serve": cmd_serve}
     try:
         return handlers[args.command](args)
     except ConfigError as err:

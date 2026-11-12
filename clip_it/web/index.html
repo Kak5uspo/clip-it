@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClipIt</title>
+<style>
+  :root {
+    --bg: #0f0f14; --panel: #17171f; --raised: #20202b; --line: #2c2c3a;
+    --text: #ececf1; --muted: #9a9aab; --accent: #ff2e97; --accent2: #7c3aed;
+    --ok: #22c55e; --bad: #ef4444; --warn: #f59e0b; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  button, input, select { font: inherit; color: inherit; }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+  header .logo { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  header h1 { font-size: 18px; margin: 0; }
+  header .count { color: var(--muted); margin-left: auto; font-size: 14px; }
+  main { display: grid; grid-template-columns: 300px minmax(0, 1fr); height: calc(100vh - 53px); }
+  nav { border-right: 1px solid var(--line); overflow-y: auto; padding: 10px; }
+  nav h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 6px 6px; }
+  .item { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; width: 100%; text-align: left;
+          padding: 9px 8px; border: 0; border-radius: 8px; background: none; cursor: pointer; }
+  .item:hover { background: var(--raised); }
+  .item[aria-current="true"] { background: var(--raised); outline: 1px solid var(--accent); }
+  .item .rank { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .item .hook { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item small { display: block; color: var(--muted); font-size: 12px; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--line); color: var(--muted); white-space: nowrap; }
+  .pill.approved { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
+  .pill.rejected { background: color-mix(in srgb, var(--bad) 22%, transparent); color: var(--bad); }
+  #view { overflow-y: auto; padding: 18px 22px 40px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .clip { display: grid; grid-template-columns: minmax(240px, 360px) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .player { position: sticky; top: 0; }
+  .player video { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: var(--radius); display: block; }
+  .meta { color: var(--muted); font-size: 13px; margin: 8px 2px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 18px; }
+  .btn { border: 1px solid var(--line); background: var(--raised); padding: 8px 14px; border-radius: 8px; cursor: pointer; color: var(--text); text-decoration: none; }
+  .btn:hover:not(:disabled) { border-color: var(--muted); }
+  .btn:disabled { opacity: .5; cursor: progress; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn.ok { border-color: var(--ok); color: var(--ok); }
+  .btn.bad { border-color: var(--bad); color: var(--bad); }
+  .btn:focus-visible, .item:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  section.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; }
+  section.card h3 { margin: 0 0 10px; font-size: 14px; }
+  label.row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  input[type=text], input[type=number] { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; }
+  input[type=number] { width: 110px; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: none; padding: 6px 14px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent2); color: #fff; }
+  .trim video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; }
+  .trim .grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-top: 8px; }
+  .words { display: flex; flex-wrap: wrap; gap: 6px; }
+  .words input { width: auto; min-width: 3ch; padding: 4px 6px; font-size: 14px; field-sizing: content; }
+  .banner { display: none; align-items: center; gap: 12px; background: color-mix(in srgb, var(--warn) 16%, transparent);
+            border: 1px solid var(--warn); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; }
+  .banner.show { display: flex; }
+  .toast { position: fixed; bottom: 18px; right: 18px; background: var(--raised); border: 1px solid var(--line); padding: 10px 14px;
+           border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .toast.error { border-color: var(--bad); }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; height: auto; }
+    nav { border-right: 0; border-bottom: 1px solid var(--line); max-height: 40vh; }
+    .clip { grid-template-columns: 1fr; }
+    .player { position: static; max-width: 360px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo" aria-hidden="true"></div>
+  <h1>ClipIt</h1>
+  <span class="count" id="count"></span>
+</header>
+<main>
+  <nav id="list" aria-label="Clips"></nav>
+  <div id="view"><p class="empty">Loading clips …</p></div>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+// Fields whose change only shows up in the video after re-rendering.
+const VISUAL = ["hook", "words", "clip_start_s", "clip_end_s", "layout", "zoom"];
+let vods = [], current = null, needsRender = new Set();
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const el = (tag, props = {}, ...children) => {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children.filter(c => c !== null && c !== undefined));
+  return node;
+};
+const clock = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
+const LABELS = { laugh: "😂 laugh", hype: "🔥 hype", shock: "😱 shock" };
+
+function toast(text, error = false) {
+  const t = $("#toast");
+  t.textContent = text; t.className = "toast show" + (error ? " error" : "");
+  clearTimeout(t.timer); t.timer = setTimeout(() => t.className = "toast", 2600);
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.detail || `Request failed (${response.status})`);
+  return body;
+}
+
+async function load() {
+  vods = (await api("/api/clips")).vods;
+  const all = vods.flatMap(v => v.candidates);
+  $("#count").textContent = `${all.length} clips · ${all.filter(c => c.status === "approved").length} approved`;
+  renderList();
+  if (!current && all.length) select(vods[0].vod, vods[0].candidates[0].spike_s);
+  if (!all.length) $("#view").replaceChildren(el("p", { className: "empty", textContent: "No clips yet. Run: uv run python -m clip_it process <VOD link>" }));
+}
+
+function find(vod, spike) {
+  const v = vods.find(v => v.vod === vod);
+  return v && { vod: v, clip: v.candidates.find(c => c.spike_s === spike) };
+}
+
+function renderList() {
+  const nav = $("#list");
+  nav.replaceChildren();
+  for (const v of vods) {
+    nav.append(el("h2", { textContent: `${v.streamer} · VOD ${v.vod}`, title: v.title }));
+    for (const c of v.candidates) {
+      const active = current && current.vod === v.vod && current.spike === c.spike_s;
+      const item = el("button", { className: "item", type: "button", onclick: () => select(v.vod, c.spike_s) },
+        el("span", { className: "rank", textContent: `#${c.rank}` }),
+        el("span", { className: "hook" }, el("span", { textContent: c.hook }),
+          el("small", { textContent: `${clock(c.spike_s)} · ${Math.round(c.clip_end_s - c.clip_start_s)} s` })),
+        el("span", { className: `pill ${c.status}`, textContent: c.status }));
+      item.setAttribute("aria-current", active ? "true" : "false");
+      nav.append(item);
+    }
+  }
+}
+
+function select(vod, spike) {
+  current = { vod, spike };
+  needsRender = new Set();
+  renderList();
+  renderClip();
+}
+
+async function save(changes, quiet = false) {
+  const { vod, spike } = current;
+  try {
+    const updated = await api(`/api/clips/${vod}/${spike}`, { method: "PATCH", body: JSON.stringify(changes) });
+    const v = vods.find(v => v.vod === vod);
+    v.candidates[v.candidates.findIndex(c => c.spike_s === spike)] = updated;
+    Object.keys(changes).filter(k => VISUAL.includes(k)).forEach(k => needsRender.add(k));
+    $("#count").textContent = `${vods.flatMap(v => v.candidates).length} clips · ${vods.flatMap(v => v.candidates).filter(c => c.status === "approved").length} approved`;
+    renderList();
+    $("#banner").classList.toggle("show", needsRender.size > 0);
+    if (!quiet) toast("Saved");
+    return updated;
+  } catch (err) { toast(err.message, true); throw err; }
+}
+
+async function rerender(button) {
+  const { vod, spike } = current;
+  button.disabled = true; button.textContent = "Rendering …";
+  try {
+    await api(`/api/clips/${vod}/${spike}/render`, { method: "POST" });
+    needsRender = new Set();
+    await load();
+    renderClip(Date.now());
+    toast("Clip rendered");
+  } catch (err) { toast(err.message, true); button.disabled = false; button.textContent = "Re-render"; }
+}
+
+function caption(c, streamer) {
+  return `${c.title}\n\nClip: twitch.tv/${streamer}\n${c.hashtags.join(" ")}`;
+}
+
+function renderClip(version = 0) {
+  const { vod: v, clip: c } = find(current.vod, current.spike);
+  const media = name => `/media/${v.vod}/${name}${version ? `?v=${version}` : ""}`;
+
+  // --- player and actions
+  const video = el("video", { controls: true, preload: "metadata", src: media(c.clip) });
+  const renderButton = el("button", { className: "btn primary", type: "button", textContent: "Re-render" });
+  renderButton.onclick = () => rerender(renderButton);
+  const posted = el("input", { type: "checkbox", checked: c.tiktok_posted, onchange: e => save({ tiktok_posted: e.target.checked }) });
+
+  const player = el("div", { className: "player" }, video,
+    el("p", { className: "meta", textContent: `#${c.rank} · ${clock(c.spike_s)} in the stream · ${c.game || "unknown game"} · ${LABELS[c.label] || "reaction"} · ${(c.clip_end_s - c.clip_start_s).toFixed(1)} s` }),
+    el("div", { className: "actions" },
+      el("button", { className: "btn ok", type: "button", textContent: c.status === "approved" ? "✓ Approved" : "Approve", onclick: () => save({ status: "approved" }).then(() => renderClip()) }),
+      el("button", { className: "btn bad", type: "button", textContent: c.status === "rejected" ? "✕ Rejected" : "Reject", onclick: () => save({ status: "rejected" }).then(() => renderClip()) }),
+      c.status !== "new" ? el("button", { className: "btn", type: "button", textContent: "Undo", onclick: () => save({ status: "new" }).then(() => renderClip()) }) : null),
+    el("div", { className: "actions" },
+      el("a", { className: "btn", href: `/media/${v.vod}/${c.clip}?download=true`, textContent: "Download MP4" }),
+      el("button", { className: "btn", type: "button", textContent: "Copy TikTok caption",
+        onclick: () => navigator.clipboard.writeText(caption(c, v.streamer)).then(() => toast("Caption copied")) })),
+    el("label", { className: "row" }, posted, "Posted on TikTok"));
+
+  // --- edits
+  const banner = el("div", { className: "banner", id: "banner" },
+    el("span", { textContent: "Changes are saved. Re-render to see them in the video." }), renderButton);
+  banner.classList.toggle("show", needsRender.size > 0);
+
+  const custom = el("input", { type: "text", maxLength: 80, value: c.hooks.includes(c.hook) ? "" : c.hook, placeholder: "Your own hook" });
+  const hookChoices = c.hooks.map(h => el("label", { className: "row" },
+    el("input", { type: "radio", name: "hook", checked: c.hook === h, onchange: () => { custom.value = ""; save({ hook: h }); } }), h));
+  custom.onchange = () => custom.value.trim() && save({ hook: custom.value });
+
+  const title = el("input", { type: "text", maxLength: 100, value: c.title, onchange: e => save({ title: e.target.value }) });
+  const tags = el("input", { type: "text", value: c.hashtags.join(" "),
+    onchange: e => save({ hashtags: e.target.value.split(/\s+/).filter(Boolean).map(t => t.startsWith("#") ? t : "#" + t) }) });
+
+  const seg = (options, value, onpick) => el("div", { className: "seg", role: "group" }, ...options.map(([key, text]) => {
+    const b = el("button", { type: "button", textContent: text, onclick: () => onpick(key) });
+    b.setAttribute("aria-pressed", String(value === key));
+    return b;
+  }));
+  const layoutPick = seg([["split", "Split"], ["blur", "Blur"]], c.layout || v.layout || "blur", key => save({ layout: key }).then(() => renderClip(version)));
+  const zoomPick = seg([[true, "On"], [false, "Off"]], c.zoom, key => save({ zoom: key }).then(() => renderClip(version)));
+
+  // --- trim on the raw excerpt
+  const raw = el("video", { controls: true, preload: "metadata", src: media(c.file) });
+  raw.addEventListener("loadedmetadata", () => { raw.currentTime = c.clip_start_s - c.file_start_s; }, { once: true });
+  const startInput = el("input", { type: "number", step: "0.1", value: (c.clip_start_s - c.file_start_s).toFixed(1) });
+  const endInput = el("input", { type: "number", step: "0.1", value: (c.clip_end_s - c.file_start_s).toFixed(1) });
+  const trim = () => save({ clip_start_s: c.file_start_s + Number(startInput.value), clip_end_s: c.file_start_s + Number(endInput.value) })
+    .then(() => renderClip(version)).catch(() => {});
+  startInput.onchange = endInput.onchange = trim;
+  const trimCard = el("section", { className: "card trim" }, el("h3", { textContent: "Start and end" }), raw,
+    el("div", { className: "grid" },
+      el("label", {}, el("span", { className: "hint", textContent: "Start (s in excerpt)" }), startInput),
+      el("button", { className: "btn", type: "button", textContent: "Start here", onclick: () => { startInput.value = raw.currentTime.toFixed(1); trim(); } }),
+      el("label", {}, el("span", { className: "hint", textContent: "End" }), endInput),
+      el("button", { className: "btn", type: "button", textContent: "End here", onclick: () => { endInput.value = raw.currentTime.toFixed(1); trim(); } }),
+      el("button", { className: "btn", type: "button", textContent: "▶ Play range", onclick: () => {
+        raw.currentTime = Number(startInput.value); raw.play();
+        const stop = () => { if (raw.currentTime >= Number(endInput.value)) { raw.pause(); raw.removeEventListener("timeupdate", stop); } };
+        raw.addEventListener("timeupdate", stop);
+      } })),
+    el("p", { className: "hint", textContent: "The excerpt includes a minute before and after the highlight. A clip may be at most 59 seconds long." }));
+
+  // --- subtitle words inside the clip
+  const inClip = c.words.map((w, i) => [w, i]).filter(([w]) => w[0] >= c.clip_start_s && w[1] <= c.clip_end_s);
+  const wordInputs = inClip.map(([w, i], n) => {
+    const input = el("input", { type: "text", value: w[2], title: `${(w[0] - c.clip_start_s).toFixed(1)} s`, ariaLabel: `Subtitle word ${n + 1}` });
+    input.onchange = () => save({ words: c.words.map((x, j) => j === i ? input.value : x[2]) });
+    return input;
+  });
+  const wordsCard = el("section", { className: "card" }, el("h3", { textContent: "Subtitles" }),
+    wordInputs.length ? el("div", { className: "words" }, ...wordInputs)
+                      : el("p", { className: "hint", textContent: "No transcript for this clip." }),
+    el("p", { className: "hint", textContent: "Fix misheard words. Hover a word to see when it is spoken." }));
+
+  const editor = el("div", {}, banner,
+    el("section", { className: "card" }, el("h3", { textContent: "Hook (first seconds, in the picture)" }), ...hookChoices, custom),
+    el("section", { className: "card" }, el("h3", { textContent: "Title and hashtags" }),
+      el("label", {}, el("span", { className: "hint", textContent: "Title" }), title),
+      el("label", {}, el("span", { className: "hint", textContent: "Hashtags, separated by spaces" }), tags)),
+    el("section", { className: "card" }, el("h3", { textContent: "Look" }),
+      el("label", { className: "row" }, el("span", { textContent: "Layout", style: "width:70px" }), layoutPick),
+      el("label", { className: "row" }, el("span", { textContent: "Zoom", style: "width:70px" }), zoomPick)),
+    trimCard, wordsCard);
+
+  $("#view").replaceChildren(el("div", { className: "clip" }, player, editor));
+}
+
+load().catch(err => $("#view").replaceChildren(el("p", { className: "empty", textContent: err.message })));
+</script>
+</body>
+</html>

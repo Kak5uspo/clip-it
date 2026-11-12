@@ -31,6 +31,7 @@ No CapCut, no manual trimming: you only review and approve.
 | 💬 **Adds subtitles** | Local speech recognition, three words at a time, the spoken word highlighted, swear words censored |
 | 🪝 **Writes the hook** | Claude suggests the on-screen hook, a title and hashtags from what was said (optional) |
 | 🔍 **Zooms on the punchline** | A short zoom at the loudest moment of the clip |
+| 🖥️ **Review dashboard** | Watch, re-trim, fix subtitles, pick the hook and approve, in your browser |
 | 🎚️ **Sounds right** | Loudness normalised to −14 LUFS, the level YouTube plays back at |
 
 Any streamer, any game, any language Whisper understands: everything is set in one config file.
@@ -80,6 +81,29 @@ uv run python -m clip_it process https://www.twitch.tv/videos/<VOD id>
 ```
 
 The clips land in `data/vods/<VOD id>/clip_*.mp4`. Next to them, `candidates.json` lists every clip with its time in the stream, the chat's reaction, three hook suggestions, a title, hashtags and the transcript. Highlights whose audio Twitch has muted are skipped and listed. Running the command again reuses what is already downloaded.
+
+### Review in the dashboard
+
+```bash
+uv run python -m clip_it serve
+```
+
+Then open <http://127.0.0.1:8000>. For every clip you can:
+
+- watch it, approve or reject it
+- pick one of the three hooks or write your own, edit title and hashtags
+- move start and end on the raw excerpt ("Start here", "End here")
+- fix misheard subtitle words
+- switch between split and blur, turn the zoom on or off
+- re-render with one click (about 10 seconds; longer if a new range needs transcribing)
+- download the MP4 and copy a ready TikTok caption
+
+Edits are saved immediately. Running `process` again keeps your edits and
+statuses; `process --redo` makes every clip from scratch.
+
+To open the dashboard on your phone in the same network, set
+`dashboard.lan: true` in `config.yaml` and `DASHBOARD_PASSWORD` in `.env`.
+The connection is not encrypted, so only do this at home.
 
 To only see what the detection finds in a chat log:
 
@@ -175,7 +199,7 @@ At the loudest moment of a clip the picture briefly zooms in (12 % for 1.2 secon
 - [x] Excerpt download, split and blur layouts
 - [x] Subtitles, fine cut, hook, auto-zoom
 - [x] AI suggestions for hook, title and hashtags
-- [ ] Dashboard: preview, re-trim, edit texts, approve
+- [x] Dashboard: preview, re-trim, edit texts, approve
 - [ ] YouTube Shorts upload with scheduling
 - [ ] Automatic check for new VODs
 - [ ] Jump cuts

@@ -75,6 +75,11 @@ subtitles:
     de: []
     en: []
 
+dashboard:
+  port: 8000
+  lan: false               # true = reachable from other devices in your network (phone);
+                           # needs DASHBOARD_PASSWORD in .env. The connection is not encrypted.
+
 # Applied to every entry under "streamers".
 streamer_defaults:
   display_name: null       # shown in titles; defaults to the login

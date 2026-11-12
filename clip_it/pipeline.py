@@ -5,13 +5,11 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from . import transcribe
+from . import clips, transcribe
 from .config import detect_settings
 from .detect import detect, read_chat
 from .edit import fine_cut
-from .render import hook_position, layout_for, render
-from .signals import loudest_moment, loudness, rank
-from .subtitles import Word, build_ass
+from .signals import loudness, rank
 from .suggest import suggest
 from .twitch import download_audio, download_chat, download_excerpt, vod_id
 
@@ -19,11 +17,12 @@ DATA = Path("data/vods")
 _LISTEN_S = 15  # how far beyond the rough window the transcript reaches, so the fine cut has room
 
 
-def process(reference: str, cfg: dict, streamer: str | None = None, say=print) -> dict:
+def process(reference: str, cfg: dict, streamer: str | None = None, say=print, redo: bool = False) -> dict:
     """Find the highlights of one VOD, download their excerpts and render the clips.
 
     Everything lands in data/vods/<id>/; the returned summary is also written
-    there as candidates.json.
+    there as candidates.json. Clips an earlier run made are kept with their edits
+    and status, unless `redo` is set.
     """
     vod = vod_id(reference)
     folder = DATA / vod
@@ -55,47 +54,41 @@ def process(reference: str, cfg: dict, streamer: str | None = None, say=print) -
     ranked, dropped = rank(highlights, levels, {**cfg["signals"], "top_n": settings["top_n"]}, offset)
 
     reserve = cfg["clip"]["reserve_s"]
+    previous = {}  # clips made by an earlier run keep their edits and status
+    if (folder / "candidates.json").exists() and not redo:
+        previous = {c["spike_s"]: c for c in clips.load(folder)["candidates"] if "words" in c}
     candidates = []
     for number, h in enumerate(ranked, 1):
+        if h.spike_s in previous:
+            candidates.append({**previous[h.spike_s], "rank": number})
+            continue
         # Files are named after the second of the stream, so a re-run finds them again.
         start, end = max(0.0, h.start_s - reserve), min(chat.duration, h.end_s + reserve)
         file = folder / f"excerpt_{h.spike_s:06d}.mp4"
         if not file.exists():
             say(f"Downloading excerpt {number} of {len(ranked)} ...")
             download_excerpt(vod, file, start, end)
-        clip = folder / f"clip_{h.spike_s:06d}.mp4"
         say(f"Cutting and rendering clip {number} of {len(ranked)} ...")
-        # From here on, times count from the start of the excerpt file.
+        # Transcript and fine cut work in seconds of the excerpt file.
         cut_start, cut_end, words = h.start_s - start, h.end_s - start, []
+        heard_from, heard_to = cut_start, cut_end
         if cfg["subtitles"]["enabled"] and transcribe.available():
-            words = transcribe.transcribe(
-                file, max(0.0, cut_start - _LISTEN_S), min(end - start, cut_end + _LISTEN_S),
-                streamer["language"], cfg["subtitles"]["model"],
-            )
+            heard_from, heard_to = max(0.0, cut_start - _LISTEN_S), min(end - start, cut_end + _LISTEN_S)
+            words = transcribe.transcribe(file, heard_from, heard_to, streamer["language"], cfg["subtitles"]["model"])
             cut_start, cut_end = fine_cut(words, cut_start, cut_end, cfg["clip"], end - start)
-        spoken = [
-            Word(w.start - cut_start, w.end - cut_start, w.text)
-            for w in words if w.start >= cut_start and w.end <= cut_end
-        ]
-        text = " ".join(w.text for w in spoken)
-        suggestion = suggest(
-            h.label, streamer["language"], text, streamer["display_name"], h.game, cfg["suggest"]
-        )
-        ass = clip.with_suffix(".ass")
-        ass.write_text(
-            build_ass(spoken, cfg["subtitles"], streamer["language"], hook=suggestion["hooks"][0],
-                      hook_y=hook_position(layout_for(streamer), streamer, cfg["render"])),
-            encoding="utf-8",
-        )
-        loud = loudest_moment(levels, start + cut_start, start + cut_end, offset,
-                              cfg["render"]["zoom"]["min_rise_db"])
-        zoom_at = None if loud is None else loud - (start + cut_start)
-        render(file, clip, cut_start, cut_end, cfg, login, ass=ass, zoom_at=zoom_at)
-        candidates.append(
-            {"rank": number, **asdict(h), "file": file.name, "file_start_s": start, "file_end_s": end,
-             "clip": clip.name, "clip_start_s": round(start + cut_start, 2), "clip_end_s": round(start + cut_end, 2),
-             **suggestion, "text": text, "zoom_at_s": zoom_at}
-        )
+        text = " ".join(w.text for w in words if w.start >= cut_start and w.end <= cut_end)
+        suggestion = suggest(h.label, streamer["language"], text, streamer["display_name"], h.game, cfg["suggest"])
+        record = {
+            "rank": number, **asdict(h), "file": file.name, "file_start_s": start, "file_end_s": end,
+            "clip": f"clip_{h.spike_s:06d}.mp4",
+            "clip_start_s": round(start + cut_start, 2), "clip_end_s": round(start + cut_end, 2),
+            **suggestion, "hook": suggestion["hooks"][0], "text": text,
+            "words": [[round(start + w.start, 2), round(start + w.end, 2), w.text] for w in words],
+            "words_from_s": round(start + heard_from, 2), "words_to_s": round(start + heard_to, 2),
+            "layout": None, "zoom": True, "status": "new", "tiktok_posted": False,
+        }
+        clips.render_clip(folder, record, cfg, login)
+        candidates.append(record)
 
     summary = {
         "vod": vod,
@@ -105,5 +98,5 @@ def process(reference: str, cfg: dict, streamer: str | None = None, say=print) -
         "candidates": candidates,
         "dropped_muted": [asdict(h) for h in dropped],
     }
-    (folder / "candidates.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    clips.save(folder, summary)
     return summary
