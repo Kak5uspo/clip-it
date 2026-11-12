@@ -13,6 +13,7 @@ from .detect import detect, read_chat
 from .pipeline import process
 from .render import layout_check, layout_for
 from .twitch import INSTALL_HINT, TOOL, ToolError, find_tool
+from .youtube import TOKEN, UploadRefused
 
 _TABLE = " #      time   score  react/s  normal  viewers  label   game"
 
@@ -50,6 +51,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         report("config.yaml", bool(streamers), ", ".join(streamers) or "no streamers configured")
     except ConfigError as err:
         report("config.yaml", False, str(err))
+    report("YouTube sign-in", TOKEN.exists(), str(TOKEN) if TOKEN.exists() else "run: uv run python -m clip_it youtube-login")
     for key in ("TWITCH_CLIENT_ID", "TWITCH_CLIENT_SECRET"):
         is_set = bool(os.environ.get(key))
         report(key, is_set, "set" if is_set else "add it to .env (see .env.example)")
@@ -101,6 +103,14 @@ def cmd_layout_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_youtube_login(args: argparse.Namespace) -> int:
+    from . import youtube
+
+    youtube.login()
+    print(f"Signed in. The token is stored in {youtube.TOKEN}; keep it private.")
+    return 0
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     import socket
 
@@ -144,15 +154,16 @@ def main(argv: list[str] | None = None) -> int:
     layout_parser.add_argument("--streamer", required=True, help="config entry whose rectangles to draw")
     layout_parser.add_argument("--at", type=float, default=0.0, help="second of the video to take the frame from")
     commands.add_parser("serve", help="open the review dashboard in your browser")
+    commands.add_parser("youtube-login", help="sign in to YouTube once, for uploads")
     args = parser.parse_args(argv)
 
     load_env()
     handlers = {"doctor": cmd_doctor, "detect": cmd_detect, "process": cmd_process, "layout-check": cmd_layout_check,
-                "serve": cmd_serve}
+                "serve": cmd_serve, "youtube-login": cmd_youtube_login}
     try:
         return handlers[args.command](args)
     except ConfigError as err:
         print(f"Config error: {err}", file=sys.stderr)
-    except (ToolError, ValueError, OSError, json.JSONDecodeError) as err:
+    except (ToolError, ValueError, OSError, json.JSONDecodeError, UploadRefused) as err:
         print(f"Error: {err}", file=sys.stderr)
     return 2

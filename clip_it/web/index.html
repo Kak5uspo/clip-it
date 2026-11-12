@@ -13,6 +13,8 @@
   * { box-sizing: border-box; }
   body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
   button, input, select { font: inherit; color: inherit; }
+  select, input[type=datetime-local] { background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; }
+  #schedule p { margin: 4px 6px; }
   header { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
   header .logo { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
   header h1 { font-size: 18px; margin: 0; }
@@ -60,7 +62,7 @@
   .banner { display: none; align-items: center; gap: 12px; background: color-mix(in srgb, var(--warn) 16%, transparent);
             border: 1px solid var(--warn); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; }
   .banner.show { display: flex; }
-  .toast { position: fixed; bottom: 18px; right: 18px; background: var(--raised); border: 1px solid var(--line); padding: 10px 14px;
+  .toast { max-width: 420px; position: fixed; bottom: 18px; right: 18px; background: var(--raised); border: 1px solid var(--line); padding: 10px 14px;
            border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   .toast.show { opacity: 1; }
   .toast.error { border-color: var(--bad); }
@@ -79,7 +81,7 @@
   <span class="count" id="count"></span>
 </header>
 <main>
-  <nav id="list" aria-label="Clips"></nav>
+  <nav aria-label="Clips"><div id="schedule"></div><div id="list"></div></nav>
   <div id="view"><p class="empty">Loading clips …</p></div>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -88,7 +90,7 @@
 "use strict";
 // Fields whose change only shows up in the video after re-rendering.
 const VISUAL = ["hook", "words", "clip_start_s", "clip_end_s", "layout", "zoom"];
-let vods = [], current = null, needsRender = new Set();
+let vods = [], current = null, needsRender = new Set(), schedule = null;
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, props = {}, ...children) => {
@@ -102,7 +104,7 @@ const LABELS = { laugh: "😂 laugh", hype: "🔥 hype", shock: "😱 shock" };
 function toast(text, error = false) {
   const t = $("#toast");
   t.textContent = text; t.className = "toast show" + (error ? " error" : "");
-  clearTimeout(t.timer); t.timer = setTimeout(() => t.className = "toast", 2600);
+  clearTimeout(t.timer); t.timer = setTimeout(() => t.className = "toast", error ? 7000 : 2600);
 }
 
 async function api(path, options = {}) {
@@ -114,6 +116,8 @@ async function api(path, options = {}) {
 
 async function load() {
   vods = (await api("/api/clips")).vods;
+  schedule = await api("/api/schedule").catch(() => null);
+  renderSchedule();
   const all = vods.flatMap(v => v.candidates);
   $("#count").textContent = `${all.length} clips · ${all.filter(c => c.status === "approved").length} approved`;
   renderList();
@@ -178,6 +182,61 @@ async function rerender(button) {
   } catch (err) { toast(err.message, true); button.disabled = false; button.textContent = "Re-render"; }
 }
 
+const when = iso => new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function renderSchedule() {
+  const box = $("#schedule");
+  if (!schedule) { box.replaceChildren(); return; }
+  box.replaceChildren(
+    el("h2", { textContent: "YouTube schedule" }),
+    schedule.signed_in ? null : el("p", { className: "hint", textContent: "Not signed in. Run: uv run python -m clip_it youtube-login" }),
+    el("p", { className: "hint", textContent: `Next free slot: ${when(schedule.next_slot)}` }),
+    ...schedule.upcoming.map(i => el("p", { className: "hint", textContent: `${when(i.publish_at)} · ${i.hook}` })));
+}
+
+async function publish(button, choice, custom) {
+  const value = choice === "custom" ? custom : choice;
+  if (choice === "custom" && !custom) { toast("Pick a date and time first", true); return; }
+  button.disabled = true; button.textContent = "Uploading …";
+  try {
+    await api(`/api/clips/${current.vod}/${current.spike}/publish`, { method: "POST", body: JSON.stringify({ when: value }) });
+    await load();
+    renderClip();
+    toast("Uploaded to YouTube");
+  } catch (err) { toast(err.message, true); button.disabled = false; button.textContent = "Approve & upload"; }
+}
+
+function publishBox(c, v) {
+  const status = (text, cls) => el("button", { className: `btn ${cls}`, type: "button", textContent: text });
+  if (c.youtube_id) {
+    const future = new Date(c.publish_at) > new Date();
+    return el("div", {},
+      el("p", { className: "meta", textContent: future ? `On YouTube, goes public ${when(c.publish_at)}` : `Public on YouTube since ${when(c.publish_at)}` }),
+      el("div", { className: "actions" },
+        el("a", { className: "btn", href: `https://youtu.be/${c.youtube_id}`, target: "_blank", rel: "noopener", textContent: "Open on YouTube" }),
+        el("a", { className: "btn", href: `https://studio.youtube.com/video/${c.youtube_id}/edit`, target: "_blank", rel: "noopener", textContent: "YouTube Studio" })));
+  }
+  const choice = el("select", {},
+    el("option", { value: "slot", textContent: schedule ? `Next free slot (${when(schedule.next_slot)})` : "Next free slot" }),
+    el("option", { value: "now", textContent: "Publish now" }),
+    el("option", { value: "custom", textContent: "Pick a time …" }));
+  choice.setAttribute("aria-label", "When to publish");
+  const custom = el("input", { type: "datetime-local", hidden: true });
+  custom.setAttribute("aria-label", "Publish at");
+  choice.onchange = () => { custom.hidden = choice.value !== "custom"; };
+  const go = el("button", { className: "btn primary", type: "button", textContent: "Approve & upload" });
+  go.onclick = () => publish(go, choice.value, custom.value);
+  const reject = status(c.status === "rejected" ? "✕ Rejected" : "Reject", "bad");
+  reject.onclick = () => save({ status: "rejected" }).then(() => renderClip());
+  const approveOnly = status(c.status === "approved" ? "✓ Approved (not uploaded)" : "Approve without upload", "ok");
+  approveOnly.onclick = () => save({ status: "approved" }).then(() => renderClip());
+  const undo = c.status !== "new" ? status("Undo", "") : null;
+  if (undo) undo.onclick = () => save({ status: "new" }).then(() => renderClip());
+  return el("div", {},
+    el("div", { className: "actions" }, choice, custom, go),
+    el("div", { className: "actions" }, approveOnly, reject, undo));
+}
+
 function caption(c, streamer) {
   return `${c.title}\n\nClip: twitch.tv/${streamer}\n${c.hashtags.join(" ")}`;
 }
@@ -194,10 +253,7 @@ function renderClip(version = 0) {
 
   const player = el("div", { className: "player" }, video,
     el("p", { className: "meta", textContent: `#${c.rank} · ${clock(c.spike_s)} in the stream · ${c.game || "unknown game"} · ${LABELS[c.label] || "reaction"} · ${(c.clip_end_s - c.clip_start_s).toFixed(1)} s` }),
-    el("div", { className: "actions" },
-      el("button", { className: "btn ok", type: "button", textContent: c.status === "approved" ? "✓ Approved" : "Approve", onclick: () => save({ status: "approved" }).then(() => renderClip()) }),
-      el("button", { className: "btn bad", type: "button", textContent: c.status === "rejected" ? "✕ Rejected" : "Reject", onclick: () => save({ status: "rejected" }).then(() => renderClip()) }),
-      c.status !== "new" ? el("button", { className: "btn", type: "button", textContent: "Undo", onclick: () => save({ status: "new" }).then(() => renderClip()) }) : null),
+    publishBox(c, v),
     el("div", { className: "actions" },
       el("a", { className: "btn", href: `/media/${v.vod}/${c.clip}?download=true`, textContent: "Download MP4" }),
       el("button", { className: "btn", type: "button", textContent: "Copy TikTok caption",

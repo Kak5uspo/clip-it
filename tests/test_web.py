@@ -94,3 +94,16 @@ def test_with_a_password_every_page_asks_for_it(tmp_path):
         assert call(base + "/api/clips", headers={"Authorization": f"Basic {right}"})[0] == 200
     finally:
         server.should_exit = True
+
+
+def test_publishing_without_permission_answers_with_the_reason(site):
+    status, body, _ = call(site + "/api/clips/123/1000/publish", "POST", {"when": "slot"})
+
+    assert status == 409 and "permission" in json.loads(body)["detail"]
+
+
+def test_the_schedule_names_the_next_free_slot(site):
+    status, body, _ = call(site + "/api/schedule")
+
+    data = json.loads(body)
+    assert status == 200 and data["next_slot"] and data["upcoming"] == []

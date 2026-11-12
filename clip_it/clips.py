@@ -10,9 +10,11 @@ import json
 import os
 import re
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
-from . import transcribe
+from . import transcribe, youtube
 from .render import hook_position, layout_for, render
 from .signals import loudest_moment
 from .subtitles import Word, build_ass
@@ -155,3 +157,51 @@ def render_clip(folder: Path, record: dict, cfg: dict, login: str) -> None:
         zoom_at = None if loud is None else loud - start
     render(folder / record["file"], clip, start - offset, end - offset, cfg, login, layout=layout,
            ass=ass, zoom_at=zoom_at)
+
+
+def publish(folder: Path, spike_s: int, when: str, cfg: dict, now: datetime | None = None) -> dict:
+    """Approve a clip and upload it to YouTube.
+
+    `when` is "slot" (the next free posting slot), "now", or a local date and time
+    such as "2026-11-19T18:00". Raises youtube.UploadRefused with the reason if the
+    upload is not possible; the record is only changed after a successful upload.
+    """
+    settings = cfg["publish"]["youtube"]
+    zone = ZoneInfo(settings["timezone"])
+    now = now or datetime.now(timezone.utc)
+    with _LOCK:
+        data = load(folder)
+        record = find(data, spike_s)
+        login = data["streamer"]
+        streamer = cfg["streamers"][login]
+        if record.get("youtube_id"):
+            raise youtube.UploadRefused("This clip is already on YouTube.")
+        youtube.check_permission(streamer, login, youtube.PERMISSIONS)
+        if when == "now":
+            publish_at = None
+        elif when == "slot":
+            taken = [datetime.fromisoformat(c["publish_at"]) for vod in all_vods(folder.parent)
+                     for c in vod["candidates"] if c.get("publish_at")]
+            publish_at = youtube.next_slot(now, settings["slots"], settings["timezone"], taken)
+        else:
+            try:
+                publish_at = datetime.fromisoformat(when)
+            except ValueError:
+                raise youtube.UploadRefused(f"Not a date and time: {when}") from None
+            publish_at = publish_at if publish_at.tzinfo else publish_at.replace(tzinfo=zone)
+            if publish_at <= now:
+                raise youtube.UploadRefused("That time is in the past.")
+    # Uploading takes a while; the lock is not held meanwhile, so the dashboard stays usable.
+    # ponytail: two approvals in the same second could pick the same slot; fine for one person.
+    video_id = youtube.upload(
+        youtube.service(), folder / record["clip"], youtube.video_title(record, streamer, settings["title"]),
+        youtube.description(record, login, settings["description"]),
+        [t.lstrip("#") for t in record["hashtags"]], streamer["language"], publish_at,
+    )
+    with _LOCK:
+        data = load(folder)
+        record = find(data, spike_s)
+        record.update(status="approved", youtube_id=video_id,
+                      publish_at=(publish_at or now).astimezone(timezone.utc).isoformat())
+        save(folder, data)
+        return record

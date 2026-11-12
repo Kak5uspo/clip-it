@@ -5,12 +5,13 @@ import base64
 import re
 import secrets
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
-from .. import clips
+from .. import clips, youtube
 from ..render import layout_for
 
 PAGE = Path(__file__).with_name("index.html")
@@ -82,6 +83,31 @@ def create_app(cfg: dict, root: Path = clips.ROOT, password: str | None = None) 
             clips.render_clip(path, current, cfg, data["streamer"])
             clips.save(path, data)  # rendering may have added words after re-trimming
         return current
+
+    @app.post("/api/clips/{vod}/{spike_s}/publish")
+    def publish(vod: str, spike_s: int, body: dict = Body(...)):
+        path, _ = record(vod, spike_s)
+        try:
+            return clips.publish(path, spike_s, str(body.get("when", "slot")), cfg)
+        except youtube.UploadRefused as err:
+            raise HTTPException(409, str(err)) from None
+        except Exception as err:  # YouTube errors: say what went wrong, keep the clip as it was
+            raise HTTPException(502, f"YouTube upload failed: {err}") from None
+
+    @app.get("/api/schedule")
+    def schedule():
+        settings = cfg["publish"]["youtube"]
+        now = datetime.now(timezone.utc)
+        items = [
+            {"vod": vod["vod"], "spike_s": c["spike_s"], "hook": c["hook"], "publish_at": c["publish_at"],
+             "youtube_id": c["youtube_id"]}
+            for vod in clips.all_vods(root) for c in vod["candidates"] if c.get("publish_at")
+        ]
+        taken = [datetime.fromisoformat(i["publish_at"]) for i in items]
+        upcoming = sorted((i for i in items if datetime.fromisoformat(i["publish_at"]) > now),
+                          key=lambda i: i["publish_at"])
+        slot = youtube.next_slot(now, settings["slots"], settings["timezone"], taken)
+        return {"next_slot": slot.isoformat(), "upcoming": upcoming, "signed_in": youtube.TOKEN.exists()}
 
     @app.get("/media/{vod}/{name}")
     def media(vod: str, name: str, download: bool = False):

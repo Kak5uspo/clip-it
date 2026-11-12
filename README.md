@@ -31,6 +31,7 @@ No CapCut, no manual trimming: you only review and approve.
 | 💬 **Adds subtitles** | Local speech recognition, three words at a time, the spoken word highlighted, swear words censored |
 | 🪝 **Writes the hook** | Claude suggests the on-screen hook, a title and hashtags from what was said (optional) |
 | 🔍 **Zooms on the punchline** | A short zoom at the loudest moment of the clip |
+| 📤 **Uploads to Shorts** | One click: into the next posting slot, scheduled on YouTube, only with the streamer's permission |
 | 🖥️ **Review dashboard** | Watch, re-trim, fix subtitles, pick the hook and approve, in your browser |
 | 🎚️ **Sounds right** | Loudness normalised to −14 LUFS, the level YouTube plays back at |
 
@@ -104,6 +105,33 @@ statuses; `process --redo` makes every clip from scratch.
 To open the dashboard on your phone in the same network, set
 `dashboard.lan: true` in `config.yaml` and `DASHBOARD_PASSWORD` in `.env`.
 The connection is not encrypted, so only do this at home.
+
+### Upload to YouTube
+
+In the dashboard, **Approve & upload** sends a clip to YouTube Shorts. It goes
+out at the next free posting slot (12:00, 15:00, 18:00 and 21:00 by default),
+right away, or at a time you pick. ClipIt uploads it as private with that
+publishing time and YouTube makes it public on its own, so your computer does
+not need to be on then. **Approve without upload** only marks a clip, for
+example to post it on TikTok yourself.
+
+ClipIt refuses to upload clips of a streamer whose written permission is not
+recorded (see [Rules of use](#rules-of-use)):
+
+```yaml
+streamers:
+  example_streamer:
+    permission:
+      date: 2026-11-15
+      via: Discord
+      proof: example_streamer.png   # screenshot in data/permissions/
+```
+
+For your own channel, set `own_channel: true` instead.
+
+Title, description and slots are set under `publish.youtube`. The default title
+is `{title} | {streamer} #shorts`; if the clip's title already names the
+streamer, the name is not added twice.
 
 To only see what the detection finds in a chat log:
 
@@ -183,6 +211,30 @@ At the loudest moment of a clip the picture briefly zooms in (12 % for 1.2 secon
 </details>
 
 <details>
+<summary><b>YouTube sign-in</b> (needed for uploads)</summary>
+
+1. Open <https://console.cloud.google.com> with the Google account that owns
+   your channel and create a project.
+2. **APIs & Services → Library**: enable **YouTube Data API v3**.
+3. **Google Auth Platform**: app name, support email, audience **External**.
+   Then, under **Audience**, choose **Publish app** to set it to
+   **In production**. In "Testing" mode Google signs you out after 7 days.
+   Because the app is not verified, Google shows a warning when you sign in;
+   choose **Advanced** and continue. That is fine for your own use.
+4. **Clients → Create client**, type **Desktop app**. Download the JSON file
+   and save it as `data/google_client_secret.json`.
+5. Sign in once:
+
+```bash
+uv run python -m clip_it youtube-login
+```
+
+The sign-in is stored in `data/google_token.json`. Keep it private; it is in
+`.gitignore`.
+
+</details>
+
+<details>
 <summary><b>Twitch API keys</b> (for finding new VODs and viewer clips; not needed for <code>process</code>)</summary>
 
 1. Open <https://dev.twitch.tv/console> and log in. Twitch requires two-factor authentication on the account.
@@ -200,7 +252,7 @@ At the loudest moment of a clip the picture briefly zooms in (12 % for 1.2 secon
 - [x] Subtitles, fine cut, hook, auto-zoom
 - [x] AI suggestions for hook, title and hashtags
 - [x] Dashboard: preview, re-trim, edit texts, approve
-- [ ] YouTube Shorts upload with scheduling
+- [x] YouTube Shorts upload with scheduling
 - [ ] Automatic check for new VODs
 - [ ] Jump cuts
 - [ ] Live mode for recording while the stream runs

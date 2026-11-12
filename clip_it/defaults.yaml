@@ -75,6 +75,17 @@ subtitles:
     de: []
     en: []
 
+publish:
+  youtube:
+    timezone: Europe/Berlin
+    slots: ["12:00", "15:00", "18:00", "21:00"]  # approved clips go out at the next free one
+    title: "{title} | {streamer} #shorts"         # also {game}; the streamer is not named twice
+    description: "{title}
+
+Clip: twitch.tv/{login}
+
+{hashtags}"
+
 dashboard:
   port: 8000
   lan: false               # true = reachable from other devices in your network (phone);
@@ -85,6 +96,11 @@ streamer_defaults:
   display_name: null       # shown in titles; defaults to the login
   language: en             # language of chat, subtitles and titles
   games: []                # only clip these Twitch categories; empty = all
+  own_channel: false       # true = this is your own channel, no permission needed for uploads
+  permission:              # written agreement of the streamer; without it ClipIt does not upload
+    date: null             # e.g. 2026-11-15
+    via: null              # e.g. Discord
+    proof: null            # screenshot file name in data/permissions/
   layout: blur             # blur = whole frame over a blurred background; split = facecam on top, gameplay below
   facecam_share: 0.38      # split: share of the height the facecam gets
   facecam: null            # split: where the facecam sits in the stream, e.g. {x: 0.76, y: 0.19, w: 0.24, h: 0.30}
