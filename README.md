@@ -23,7 +23,7 @@ No CapCut, no manual trimming: you only review and approve.
 
 ## What it does
 
-| | |
+| Feature | What it means |
 |---|---|
 | 🔎 **Finds highlights** | Reads the Twitch chat and spots bursts of reactions (laughing, hype, shock), ranked with the loudness of the stream |
 | ✂️ **Cuts cleanly** | Downloads only the moments it needs and moves start and end onto sentence boundaries |
@@ -39,16 +39,10 @@ Any streamer, any game, any language Whisper understands: everything is set in o
 
 ```mermaid
 flowchart LR
-    A[Twitch VOD] --> B[Chat log]
+    A[Twitch VOD] --> B[Chat log<br>+ audio]
     B --> C{Reaction<br>bursts}
-    A --> D[Audio track]
-    D --> C
-    C --> E[Top clips]
-    E --> F[Download<br>excerpts]
-    F --> G[Transcribe<br>& fine cut]
-    G --> H[Hook, title,<br>hashtags]
-    H --> I[Render<br>1080×1920]
-    I --> J[You review]
+    C --> D[Cut, subtitles,<br>hook, zoom]
+    D --> E[You review<br>& approve]
 ```
 
 A highlight is a moment when many different viewers react within a few seconds: with laughing, hype or shock emotes, typed laughter ("hahaha", "xD"), "???" or hype words. Plain chat does not count, so polls, greetings and guessing games do not look like highlights. A single spammer cannot trigger one either.
