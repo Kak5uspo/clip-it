@@ -73,11 +73,14 @@ def process(reference: str, cfg: dict, streamer: str | None = None, say=print) -
                 streamer["language"], cfg["subtitles"]["model"],
             )
             cut_start, cut_end = fine_cut(words, cut_start, cut_end, cfg["clip"], end - start)
-        suggestion = suggest(h.label, streamer["language"])
         spoken = [
             Word(w.start - cut_start, w.end - cut_start, w.text)
             for w in words if w.start >= cut_start and w.end <= cut_end
         ]
+        text = " ".join(w.text for w in spoken)
+        suggestion = suggest(
+            h.label, streamer["language"], text, streamer["display_name"], h.game, cfg["suggest"]
+        )
         ass = clip.with_suffix(".ass")
         ass.write_text(
             build_ass(spoken, cfg["subtitles"], streamer["language"], hook=suggestion["hooks"][0],
@@ -88,7 +91,7 @@ def process(reference: str, cfg: dict, streamer: str | None = None, say=print) -
         candidates.append(
             {"rank": number, **asdict(h), "file": file.name, "file_start_s": start, "file_end_s": end,
              "clip": clip.name, "clip_start_s": round(start + cut_start, 2), "clip_end_s": round(start + cut_end, 2),
-             **suggestion, "text": " ".join(w.text for w in spoken)}
+             **suggestion, "text": text}
         )
 
     summary = {

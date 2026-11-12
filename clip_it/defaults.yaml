@@ -47,6 +47,11 @@ render:
   credit: "twitch.tv/{login}"  # small text in the picture; "" = none
   credit_opacity: 0.6
 
+suggest:
+  provider: anthropic      # anthropic = Claude writes hook, title and hashtags from the transcript
+                           # (needs ANTHROPIC_API_KEY in .env and: uv sync --extra ai); rules = stock texts
+  model: claude-opus-5-5
+
 subtitles:
   enabled: true            # needs faster-whisper (uv sync --extra subtitles); without it clips have no subtitles
   model: small             # Whisper model: small is quick, medium more accurate and about three times slower

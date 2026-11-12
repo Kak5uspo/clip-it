@@ -95,6 +95,8 @@ def build_ass(
         shown = [_shown(w.text, s, banned) for w in group]
         for i, word in enumerate(group):
             end = group[i + 1].start if i + 1 < len(group) else word.end
+            if _clock(end) == _clock(word.start):
+                continue  # no time to show it; ffmpeg would otherwise drop other lines, the hook among them
             parts = [f"{{\\c{highlight}{pop}}}{t}{{\\r}}" if j == i else t for j, t in enumerate(shown)]
             lines.append(f"Dialogue: 0,{_clock(word.start)},{_clock(end)},Sub,,0,0,0,,{position}{' '.join(parts)}")
     return "\n".join(lines) + "\n"

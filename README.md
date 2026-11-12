@@ -79,6 +79,21 @@ of speech took 10 seconds with `small` and 82 seconds with `medium`; `medium`
 got slang and punctuation noticeably better. The model is downloaded on first
 use (about 0.5 GB for `small`, 1.5 GB for `medium`).
 
+### Hook, title and hashtags
+
+With an [Anthropic API key](https://console.anthropic.com) in `.env` as
+`ANTHROPIC_API_KEY` and the optional extra installed, Claude writes three
+hooks, a title and hashtags for every clip from its transcript:
+
+```bash
+uv sync --extra ai
+```
+
+Each clip costs a fraction of a cent. The transcript is sent to the Anthropic
+API for this. Without a key, or if a request fails, ClipIt uses stock texts
+that describe the chat's reaction ("Chat is dying of laughter"). Set
+`suggest.provider: rules` to always use those.
+
 On Windows, keep the project in a folder with a short path. Tools that nest
 their files deeply can hit the 260-character path limit otherwise.
 

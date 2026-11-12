@@ -88,7 +88,7 @@ def build_config(user: dict | None) -> dict:
     user = _mapping(user, "config.yaml")
     entries = _mapping(user.pop("streamers", None), "streamers")
     cfg = _merge(DEFAULTS, user)
-    for section in ("detect", "signals", "clip", "render", "subtitles"):
+    for section in ("detect", "signals", "clip", "render", "subtitles", "suggest"):
         _check(section, cfg[section], section)
     for login, entry in entries.items():
         login = str(login).lower()

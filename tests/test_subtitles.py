@@ -102,3 +102,16 @@ def test_without_words_there_are_no_subtitle_lines_but_a_hook_still_works():
     ass = build_ass([], STYLE, hook="Schau dir das an", hook_y=730)
 
     assert [",Hook," in line for line in dialogue_lines(ass)] == [True]
+
+
+def test_words_without_duration_get_no_line_of_their_own():
+    # Whisper sometimes returns a word whose start equals its end; ffmpeg then
+    # drops other lines of the file, such as the hook.
+    spoken = [Word(1.0, 1.4, "ach"), Word(1.4, 1.4, "du"), Word(1.4, 1.9, "scheiße")]
+
+    ass = build_ass(spoken, STYLE, hook="Hook", hook_y=730)
+
+    for line in dialogue_lines(ass):
+        start, end = line.split(",")[1:3]
+        assert start != end
+    assert sum(",Sub," in line for line in dialogue_lines(ass)) == 2
