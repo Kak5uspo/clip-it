@@ -33,6 +33,24 @@ def loudness(audio: Path) -> list[float]:
     return [float(line[len(_KEY):]) for line in result.stdout.splitlines() if line.startswith(_KEY)]
 
 
+def loudest_moment(
+    levels: list[float] | None, start: float, end: float, offset: int = 0, min_rise_db: float = 6.0
+) -> int | None:
+    """Stream second of the loudest moment between `start` and `end`, or None if nothing stands out.
+
+    The first second is skipped (the hook is on screen then). A moment counts only if it is
+    at least `min_rise_db` louder than the clip's typical level.
+    """
+    if not levels:
+        return None
+    seconds = [s for s in range(int(start) + 1, int(end)) if 0 <= s - offset < len(levels)]
+    audible = [(levels[s - offset], s) for s in seconds if levels[s - offset] > _SILENT_DB]
+    if len(audible) < 3:
+        return None
+    loudest, second = max(audible, key=lambda pair: pair[0])  # ties: the earliest second
+    return second if loudest - median(v for v, _ in audible) >= min_rise_db else None
+
+
 def rank(
     highlights: list[Highlight], levels: list[float] | None, s: dict, offset: int = 0
 ) -> tuple[list[Highlight], list[Highlight]]:

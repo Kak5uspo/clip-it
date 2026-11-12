@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .twitch import ToolError, find_tool
 
+_ZOOM_RAMP_S = 0.15  # seconds to zoom in and back out
 FONT = Path(__file__).resolve().parent.parent / "assets" / "fonts" / "Montserrat-Black.ttf"
 
 # H.264 encoders with their quality settings, in the order "auto" tries them.
@@ -69,7 +70,7 @@ def hook_position(layout: str, streamer: dict, r: dict) -> int:
     return (r["height"] - r["width"] * 9 // 16) // 2 - 70
 
 
-def _graph(layout: str, streamer: dict, r: dict, login: str, ass: Path | None) -> str:
+def _graph(layout: str, streamer: dict, r: dict, login: str, ass: Path | None, zoom_at: float | None) -> str:
     w, h = r["width"], r["height"]
     if layout == "split":
         cam_h = _cam_height(streamer, r)
@@ -92,6 +93,14 @@ def _graph(layout: str, streamer: dict, r: dict, login: str, ass: Path | None) -
         )
         credit_y = (h + w * 9 // 16) // 2 + 20  # just below a 16:9 picture
     graph += f",fps={r['fps']},setsar=1"
+    if zoom_at is not None and r["zoom"]["enabled"]:
+        # Ease in over _ZOOM_RAMP_S from zoom_at, hold, ease back out; magnified around the centre.
+        z, a, hold = r["zoom"]["factor"], zoom_at, r["zoom"]["hold_s"]
+        k = f"clip(min((it-{a:.3f})/{_ZOOM_RAMP_S},({a + 2 * _ZOOM_RAMP_S + hold:.3f}-it)/{_ZOOM_RAMP_S}),0,1)"
+        graph += (
+            f",zoompan=z='1+{z - 1:.4f}*{k}':d=1:x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2'"
+            f":s={w}x{h}:fps={r['fps']}"
+        )
     credit = r["credit"].format(login=login)
     if credit:
         opacity = r["credit_opacity"]
@@ -106,18 +115,19 @@ def _graph(layout: str, streamer: dict, r: dict, login: str, ass: Path | None) -
 
 def render(
     source: Path, out: Path, start: float, end: float, cfg: dict, login: str,
-    layout: str | None = None, ass: Path | None = None,
+    layout: str | None = None, ass: Path | None = None, zoom_at: float | None = None,
 ) -> None:
     """Render the part of `source` from `start` to `end` (seconds) as a vertical clip.
 
-    `ass` is an optional subtitle file whose times count from the start of the clip.
+    `ass` is an optional subtitle file whose times count from the start of the clip;
+    `zoom_at` is the second of the clip at which the picture briefly zooms in.
     """
     r, streamer = cfg["render"], cfg["streamers"][login]
     encoder = pick_encoder(r["encoder"])
     out.parent.mkdir(parents=True, exist_ok=True)
     result = _ffmpeg(
         "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}", "-i", str(source),
-        "-filter_complex", _graph(layout or layout_for(streamer), streamer, r, login, ass),
+        "-filter_complex", _graph(layout or layout_for(streamer), streamer, r, login, ass, zoom_at),
         "-map", "[v]", "-map", "0:a:0",
         # ponytail: single-pass loudnorm; measure first and run it twice if clips miss the target audibly.
         "-af", f"loudnorm=I={r['loudness_lufs']}:TP=-1.5:LRA=11", "-ar", "48000",

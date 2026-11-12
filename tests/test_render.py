@@ -170,6 +170,19 @@ def test_subtitles_and_hook_are_burned_into_the_picture(source, tmp_path):
 
 
 @needs_ffmpeg
+def test_the_picture_zooms_in_at_the_loud_moment_and_back_out(source, tmp_path):
+    out = tmp_path / "zoom.mp4"
+
+    render(source, out, 0.0, 5.0, config(layout="split", facecam=FACECAM, gameplay=GAMEPLAY), "test", zoom_at=2.0)
+
+    # Just above the dividing line the facecam (red) shows; zoomed in, the picture is
+    # magnified around its centre and the gameplay (blue) moves up into that spot.
+    assert is_red(pixel(out, 540, 715, at=1.0))
+    assert is_blue(pixel(out, 540, 715, at=2.6))
+    assert is_red(pixel(out, 540, 715, at=4.5))
+
+
+@needs_ffmpeg
 def test_layout_check_draws_the_rectangles_onto_a_frame(source, tmp_path):
     out = tmp_path / "check.png"
     streamer = config(layout="split", facecam=FACECAM, gameplay=GAMEPLAY)["streamers"]["test"]

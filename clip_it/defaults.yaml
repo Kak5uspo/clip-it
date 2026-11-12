@@ -46,6 +46,11 @@ render:
   loudness_lufs: -14       # loudness target; -14 is what YouTube plays back at
   credit: "twitch.tv/{login}"  # small text in the picture; "" = none
   credit_opacity: 0.6
+  zoom:                    # brief zoom at the loudest moment of a clip
+    enabled: true
+    factor: 1.12           # 1.12 = 12 % closer
+    hold_s: 1.2
+    min_rise_db: 6         # only if that moment is this much louder than the rest of the clip
 
 suggest:
   provider: anthropic      # anthropic = Claude writes hook, title and hashtags from the transcript

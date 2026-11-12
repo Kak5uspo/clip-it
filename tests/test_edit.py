@@ -70,3 +70,19 @@ def test_the_clip_stays_inside_the_excerpt():
 
     assert start >= 0.0
     assert end <= TOTAL
+
+
+def test_a_lone_word_before_a_long_silence_is_cut_from_the_start():
+    words = [Word(57.0, 57.4, "hey!")] + sentence(63, 70) + sentence(72, 90)
+
+    start, _ = fine_cut(words, 60.0, 88.0, LIMITS, TOTAL)
+
+    assert start == pytest.approx(63.0, abs=0.3)
+
+
+def test_silence_far_into_the_clip_is_left_alone():
+    words = sentence(57, 62) + sentence(75, 90)  # the pause comes 18 s in, close to the reaction
+
+    start, _ = fine_cut(words, 60.0, 88.0, LIMITS, TOTAL)
+
+    assert start == pytest.approx(57.0, abs=0.3)

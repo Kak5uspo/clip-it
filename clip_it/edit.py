@@ -5,6 +5,8 @@ from .subtitles import Word
 
 _PAUSE_S = 0.7  # a silence this long ends a sentence
 _MAX_BACK_S = 8.0  # how far the start may move back to reach the beginning of a sentence
+_LEAD_GAP_S = 2.0  # a silence this long after the first words of a clip is cut away ...
+_MAX_SKIP_S = 10.0  # ... if it ends within this many seconds of the clip's start
 _PAD_S = 0.15  # air before the first word
 _TAIL_S = 0.4  # ... and after the last one, so the reaction can ring out
 
@@ -36,6 +38,15 @@ def fine_cut(
     sentence_starts = [s[0].start for s in sentences if rough_start - _MAX_BACK_S <= s[0].start <= rough_start]
     word_starts = [w.start for w in words if w.start <= rough_start]
     start = sentence_starts[-1] if sentence_starts else word_starts[-1] if word_starts else rough_start
+    # A word or two followed by a long silence makes a weak opening: start after the silence,
+    # as long as that is early in the clip, well before the moment the chat reacts to.
+    following = [w for w in words if w.start >= start]
+    opening = start
+    for previous, word in zip(following, following[1:]):
+        if word.start > opening + _MAX_SKIP_S:
+            break
+        if word.start - previous.end > _LEAD_GAP_S:
+            start = word.start
 
     # End: the end of the sentence running at the rough end ...
     ends = [s[-1].end for s in sentences]

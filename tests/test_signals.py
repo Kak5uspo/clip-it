@@ -5,7 +5,7 @@ import subprocess
 import pytest
 
 from clip_it.detect import Highlight
-from clip_it.signals import loudness, rank
+from clip_it.signals import loudest_moment, loudness, rank
 
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
 
@@ -105,3 +105,25 @@ def test_only_the_top_n_are_kept():
     ranked, _ = rank(highlights, None, {**SETTINGS, "top_n": 2})
 
     assert [h.score for h in ranked] == [5.0, 4.0]
+
+
+def test_the_loudest_moment_of_a_clip_is_found_in_stream_seconds():
+    levels = stream_levels()
+    levels[320:322] = [-6.0, -6.0]  # a scream 20 s into the clip
+
+    assert loudest_moment(levels, 300, 330, offset=0, min_rise_db=6) == 320
+
+
+def test_no_loudest_moment_when_nothing_stands_out():
+    assert loudest_moment(stream_levels(), 300, 330, offset=0, min_rise_db=6) is None
+
+
+def test_the_first_second_of_a_clip_is_not_used_for_the_zoom():
+    levels = stream_levels()
+    levels[300] = -6.0  # the hook is on screen then
+
+    assert loudest_moment(levels, 300, 330, offset=0, min_rise_db=6) is None
+
+
+def test_without_audio_there_is_no_loudest_moment():
+    assert loudest_moment(None, 300, 330, offset=0, min_rise_db=6) is None

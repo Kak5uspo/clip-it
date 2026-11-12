@@ -10,7 +10,7 @@ from .config import detect_settings
 from .detect import detect, read_chat
 from .edit import fine_cut
 from .render import hook_position, layout_for, render
-from .signals import loudness, rank
+from .signals import loudest_moment, loudness, rank
 from .subtitles import Word, build_ass
 from .suggest import suggest
 from .twitch import download_audio, download_chat, download_excerpt, vod_id
@@ -87,11 +87,14 @@ def process(reference: str, cfg: dict, streamer: str | None = None, say=print) -
                       hook_y=hook_position(layout_for(streamer), streamer, cfg["render"])),
             encoding="utf-8",
         )
-        render(file, clip, cut_start, cut_end, cfg, login, ass=ass)
+        loud = loudest_moment(levels, start + cut_start, start + cut_end, offset,
+                              cfg["render"]["zoom"]["min_rise_db"])
+        zoom_at = None if loud is None else loud - (start + cut_start)
+        render(file, clip, cut_start, cut_end, cfg, login, ass=ass, zoom_at=zoom_at)
         candidates.append(
             {"rank": number, **asdict(h), "file": file.name, "file_start_s": start, "file_end_s": end,
              "clip": clip.name, "clip_start_s": round(start + cut_start, 2), "clip_end_s": round(start + cut_end, 2),
-             **suggestion, "text": text}
+             **suggestion, "text": text, "zoom_at_s": zoom_at}
         )
 
     summary = {
